@@ -427,5 +427,5 @@ tjs = r"""
         [btnStart, btnStage2, btnStage3].forEach(b => b.addEventListener('click', tryFullscreen));
 """
 rep('    </script>\n\n    <!-- 이미지 에셋', tjs+'    </script>\n\n    <!-- 이미지 에셋')
-open(ROOT+'/LastNeighbor.html','w',encoding='utf8').write(src)
+open(ROOT+'/index.html','w',encoding='utf8').write(src)
 print(len(src))
