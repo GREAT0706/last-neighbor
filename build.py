@@ -117,7 +117,7 @@ rep('<div id="s2-hud" class="hidden">', views+'<div id="s2-hud" class="hidden">'
 box="""<div id="instruction-box-3" class="hidden bg-gray-900 border border-gray-700 p-6 rounded text-left max-w-xl mb-8">
             <h3 class="text-xl font-bold text-red-500 mb-4 border-b border-gray-700 pb-2">STAGE 3 - 생존 수칙</h3>
             <ul class="list-disc pl-5 space-y-3 text-gray-300">
-                <li>방 곳곳(왼쪽·정면·오른쪽)에 <strong class="text-white">열쇠 5개</strong>가 떨어져 있어요(방마다 최소 1개, 자리는 매번 달라져요). <strong class="text-white">← →</strong> 로 둘러보고 반짝이는 열쇠를 찾으세요. 방마다 1개 이상 있어요. 열쇠를 <strong class="text-white">마우스로 클릭</strong>하면 줍기 시작해요. (1.5초, 커서를 열쇠에서 치우거나 돌아보면 취소돼요)</li>
+                <li>방 곳곳(왼쪽·정면·오른쪽)에 <strong class="text-white">열쇠 5개</strong>가 떨어져 있어요(방마다 최소 1개, 자리는 매번 달라져요). <strong class="text-white">← →</strong> 로 둘러보고 반짝이는 열쇠를 찾으세요. 방마다 1개 이상 있어요. 열쇠를 <strong class="text-white">꾹 누르고 있으면</strong>(마우스 버튼 / 손가락) 1.5초 동안 줍는 게 진행돼요. 중간에 떼거나 돌아보면 취소돼요.</li>
                 <li><strong class="text-yellow-400">5개 중 진짜 열쇠는 단 하나</strong>예요. 한 번에 하나만 들 수 있고, 맞는지는 <strong class="text-white">자물쇠를 끝까지 따봐야만</strong> 알 수 있어요. 정면 자물쇠 앞에서 <strong class="text-white">ENTER</strong>를 누르면 바로 자물쇠 따기가 시작돼요.</li>
                 <li>움직이는 흰 원 위에 마우스를 올려두어 자물쇠를 풀어요. 100%가 됐을 때 <strong class="text-white">철컥 소리</strong>와 함께 열리면 진짜 열쇠, 열리지 않으면 가짜예요(그 열쇠는 사라져요). 술래 때문에 끊겨도 진행도는 유지돼요.</li>
                 <li><strong class="text-blue-400">발소리가 들리면</strong> 술래가 오고 있는 거예요. <strong class="text-white">SPACE</strong>로 장롱 안에 숨으세요. <strong class="text-red-600 font-bold underline">술래가 도착할 때 밖에 있으면 죽습니다.</strong></li>
@@ -231,7 +231,6 @@ settings = """<div id="settings" style="margin:0 0 22px;padding:14px 22px;backgr
             <span style="display:flex;gap:10px;align-items:center"><input id="set-bri" type="range" min="0" max="100" step="5" style="width:130px"><b id="set-bri-v" style="min-width:3.2em;text-align:right;color:#fff"></b></span>
             <div style="grid-column:1/-1;border-top:1px solid #333;padding-top:8px"><div style="font-size:.8rem;color:#888;margin-bottom:2px;text-align:center">🏆 내 기록 (처음부터 끝까지 클리어한 판)</div><table id="rec-table" style="margin:0 auto;border-collapse:collapse;font-size:.88rem;color:#ccc"></table></div>
         </div>
-        <div id="bright-ov" style="position:fixed;inset:0;pointer-events:none;z-index:99999;opacity:0"></div>
         """
 rep('        <button id="btn-start"', '        '+settings+'<button id="btn-start"')
 settingsjs = r"""
@@ -325,5 +324,108 @@ settingsjs = r"""
         })();
 """
 rep('    </script>\n\n    <!-- 이미지 에셋', settingsjs+'    </script>\n\n    <!-- 이미지 에셋')
+
+# ===== 모바일(터치) 지원 + 밝기 오버레이 위치 수정 =====
+tcss = """
+        /* --- 터치 컨트롤 --- */
+        #touch-controls { position: fixed; inset: 0; pointer-events: none; z-index: 80; display: none; }
+        #touch-controls .tc { position: absolute; pointer-events: auto; touch-action: none; display: flex; align-items: center; justify-content: center;
+            border-radius: 50%; border: 2px solid rgba(255,90,90,.75); background: rgba(40,0,0,.55); color: #fff; font: 700 .9rem 'Noto Sans KR', sans-serif;
+            text-align: center; line-height: 1.15; user-select: none; -webkit-user-select: none; box-shadow: 0 0 12px rgba(255,0,0,.25); }
+        #touch-controls .tc.down { background: rgba(170,0,0,.85); transform: scale(.93); }
+        #tc-l, #tc-r { width: 66px; height: 66px; font-size: 1.5rem; bottom: calc(14px + env(safe-area-inset-bottom)); }
+        #tc-l { left: calc(14px + env(safe-area-inset-left)); }
+        #tc-r { left: calc(94px + env(safe-area-inset-left)); }
+        #tc-space { width: 96px; height: 96px; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); }
+        #tc-enter { width: 80px; height: 80px; right: calc(122px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); }
+        #tc-flash { width: 84px; height: 84px; right: calc(14px + env(safe-area-inset-right)); bottom: calc(122px + env(safe-area-inset-bottom)); border-color: #ffd34d; background: rgba(60,45,0,.6); }
+        #rotate-msg { display: none; position: fixed; inset: 0; z-index: 99998; background: #000; color: #ddd; align-items: center; justify-content: center;
+            text-align: center; font: 700 1.3rem 'Noto Sans KR', sans-serif; line-height: 1.6; padding: 24px; }
+        @media (orientation: portrait) { body.touch #rotate-msg { display: flex; } }
+        #ui-overlay { touch-action: pan-y; }
+        body.touch #s3-compass span[style] { display: none; }
+        @media (max-height: 600px) {
+            #ui-overlay h1 { order: -10; font-size: 2.6rem; margin-bottom: 4px; }
+            #ui-overlay h2 { order: -9; font-size: 1.1rem; margin-bottom: 10px; }
+            #run-result { order: -8; }
+            #btn-start { order: -7; flex: none; margin-bottom: 16px; }
+            #settings { margin-bottom: 12px !important; }
+        }
+"""
+rep("        .hidden { display: none !important; }", tcss+"        .hidden { display: none !important; }")
+tcHtml = """    <div id="bright-ov" style="position:fixed;inset:0;pointer-events:none;z-index:99999;opacity:0"></div>
+    <div id="rotate-msg"><div>📱<br>화면을 가로로 돌려서<br>플레이해 주세요</div></div>
+    <div id="touch-controls">
+        <div class="tc" id="tc-l" data-key="ArrowLeft">◀</div>
+        <div class="tc" id="tc-r" data-key="ArrowRight">▶</div>
+        <div class="tc" id="tc-enter" data-key="Enter">ENTER</div>
+        <div class="tc" id="tc-space" data-key="Space">SPACE</div>
+        <div class="tc" id="tc-flash" data-flash="1">📸<br>플래시</div>
+    </div>
+"""
+rep('    <div id="game-container">', tcHtml+'    <div id="game-container">')
+rep("            // 게임 중에는 기본 우클릭 메뉴 무조건 차단\n            e.preventDefault();\n","            // 게임 중에는 기본 우클릭 메뉴 무조건 차단\n            e.preventDefault();\n            if (touchMode && !e.__flashBtn) return;     // 터치 기기에서는 길게 누르기(우클릭 흉내)로 플래시가 터지지 않게\n")
+tjs = r"""
+        // --- 모바일(터치) 조작: 화면 버튼이 키보드 입력을 대신하고, 손가락이 마우스를 대신함 ---
+        const touchMode = (() => { try { return new URLSearchParams(location.search).has('touch') || matchMedia('(hover: none) and (pointer: coarse)').matches; } catch (e) { return false; } })();
+        let ptrDown = false;
+        const ptrs = new Set();
+        const tcEl = document.getElementById('touch-controls');
+        document.body.classList.toggle('touch', touchMode);
+        const inCtl = (t) => !!(t && t.closest && t.closest('#touch-controls'));
+        function setPtr(e) {
+            mouseX = e.clientX; mouseY = e.clientY;
+            if (isGameRunning && currentView === 'hallway') updateHoverSide();
+        }
+        window.addEventListener('pointerdown', (e) => { if (inCtl(e.target)) return; ptrs.add(e.pointerId); ptrDown = true; setPtr(e); }, true);
+        window.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || inCtl(e.target)) return; if (ptrs.has(e.pointerId)) setPtr(e); }, true);
+        const ptrUp = (e) => { ptrs.delete(e.pointerId); ptrDown = ptrs.size > 0; };
+        window.addEventListener('pointerup', ptrUp, true);
+        window.addEventListener('pointercancel', ptrUp, true);
+        window.addEventListener('blur', () => { ptrs.clear(); ptrDown = false; });
+        // 손가락을 떼면 마우스 위치 없음 처리 (복도에서 보고 있는 쪽은 유지해서 플래시 버튼을 누를 수 있게)
+        setInterval(() => {
+            if (touchMode && !ptrDown && !(isGameRunning && currentView === 'hallway')) { mouseX = null; mouseY = null; }
+        }, 50);
+        function fireKey(code) { window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true })); }
+        tcEl.querySelectorAll('.tc').forEach(b => {
+            b.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                b.classList.add('down');
+                if (b.dataset.flash) {
+                    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: mouseX !== null ? mouseX : innerWidth / 2, clientY: mouseY !== null ? mouseY : innerHeight / 2 });
+                    ev.__flashBtn = true; window.dispatchEvent(ev);
+                } else fireKey(b.dataset.key);
+            });
+            const rel = () => b.classList.remove('down');
+            b.addEventListener('pointerup', rel); b.addEventListener('pointercancel', rel); b.addEventListener('pointerleave', rel);
+            b.addEventListener('contextmenu', (e) => e.preventDefault());
+        });
+        const tcLab = {};
+        function tcSet(id, show, label) {
+            const el = document.getElementById(id);
+            el.style.display = show ? 'flex' : 'none';
+            if (show && label !== undefined && tcLab[id] !== label) { tcLab[id] = label; el.innerHTML = label; }
+        }
+        function updateTouchUI() {
+            const st = isGameRunning ? 1 : (s2.running ? 2 : (s3.running ? 3 : 0));
+            const show = touchMode && st > 0 && !isPaused;
+            tcEl.style.display = show ? 'block' : 'none';
+            if (!show) return;
+            tcSet('tc-l', st >= 2); tcSet('tc-r', st >= 2);
+            tcSet('tc-space', true, st === 1 ? '시점<br>전환' : (st === 2 ? '문<br>밀기' : (s3.hidden ? '밖으로<br>나가기' : '장롱에<br>숨기')));
+            tcSet('tc-enter', st === 3, s3.hidden ? '문<br>막기' : 'ENTER');
+            tcSet('tc-flash', st === 1 && currentView === 'hallway');
+        }
+        setInterval(updateTouchUI, 120);
+        // 모바일: 시작 버튼을 누르면 전체화면 + 가로 고정 시도 (지원하지 않는 기기는 그냥 무시)
+        function tryFullscreen() {
+            if (!touchMode) return;
+            try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (() => { })).call(el); } catch (e) { }
+            try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { }
+        }
+        [btnStart, btnStage2, btnStage3].forEach(b => b.addEventListener('click', tryFullscreen));
+"""
+rep('    </script>\n\n    <!-- 이미지 에셋', tjs+'    </script>\n\n    <!-- 이미지 에셋')
 open(ROOT+'/LastNeighbor.html','w',encoding='utf8').write(src)
 print(len(src))

@@ -27,9 +27,9 @@
         // 열쇠가 놓인 위치 (화면 가로/세로 %) - 각 방향에 하나씩
         // 열쇠가 놓일 수 있는 자리 (각 방향에 1개씩, 자리는 매번 랜덤). 3개 중 1개만 진짜 열쇠!
         const KEY_POOL = {      // 가로 20~80% 안쪽만 사용 (16:9 화면에서는 양옆이 잘려 보임)
-            L: [[67, 90], [24, 91], [78, 91], [20, 90]],
-            F: [[70, 91], [25, 90], [80, 91], [20, 91]],
-            R: [[31, 91], [74, 90], [20, 91], [80, 90]]
+            L: [[67, 85], [31, 86], [73, 83], [27, 84]],
+            F: [[68, 84], [30, 85], [73, 86], [27, 83]],
+            R: [[33, 86], [72, 84], [28, 85], [74, 83]]
         };
         const LOCK_SPOT = [36.3, 53];              // 정면 벽의 자물쇠 위치
 
@@ -124,7 +124,7 @@
             s3.keyEls = s3.keys.map(() => { const el = oKey.cloneNode(true); el.removeAttribute('id'); oKey.parentNode.appendChild(el); return el; });
 
             progressBar.style.width = '0%'; progressText.textContent = '0%';
-            viewIndicator.textContent = "[← →] 둘러보기 / [클릭] 열쇠 줍기 / [ENTER] 자물쇠 / [SPACE] 장롱";
+            viewIndicator.textContent = "[← →] 둘러보기 / [꾹 누르기] 열쇠 줍기 / [ENTER] 자물쇠 / [SPACE] 장롱";
             s3Hud.classList.remove('hidden');
             s3Render();
             s3.running = true;
@@ -198,7 +198,7 @@
                 s3Compass.style.bottom = '1.2vh';
                 s3Compass.innerHTML = '<span style="border:0;background:none">흰 원 위에 마우스를 올려두세요 / ← → : 돌아서기 / SPACE: 숨기</span>';
             } else {
-                s3Compass.innerHTML = `<span class="arrow">←</span>${LOOKS.map(k => `<span class="${k === s3.look ? 'on' : ''}">${LOOK_NAME[k]}</span>`).join('')}<span class="arrow">→</span><span style="border:0;background:none">클릭: 줍기 / SPACE: 숨기</span>`;
+                s3Compass.innerHTML = `<span class="arrow">←</span>${LOOKS.map(k => `<span class="${k === s3.look ? 'on' : ''}">${LOOK_NAME[k]}</span>`).join('')}<span class="arrow">→</span><span style="border:0;background:none">꾹 누르기: 줍기 / SPACE: 숨기</span>`;
             }
 
             // 중앙 문구: 연타 안내 / 줍는 진행도
@@ -208,7 +208,7 @@
             } else if (!s3.hidden && s3.toast) {
                 html = `<div class="mid">${s3.toast.text}</div>`;
             } else if (!s3.hidden && !inLock && !s3.pick && !s3.held && s3.hoverKey) {
-                html = `<div class="mid">클릭: 열쇠 줍기</div>`;
+                html = `<div class="mid">꾹 누르기: 열쇠 줍기</div>`;
             } else if (!s3.hidden && !inLock && s3.look === 'F' && !s3.pick && s3.held) {
                 html = `<div class="mid">ENTER: 자물쇠 따기</div>`;
             } else if (!s3.hidden && s3.pick) {
@@ -360,7 +360,7 @@
 
             // 열쇠 줍기 진행
             if (s3.pick) {
-                if (s3.hidden || s3.look !== s3.pick.view || s3.turning || s3KeyHere() !== s3.pick.key) {
+                if (s3.hidden || s3.look !== s3.pick.view || s3.turning || !ptrDown || s3KeyHere() !== s3.pick.key) {
                     s3.pick = null;
                 } else {
                     s3.pick.t += dt;
@@ -424,7 +424,7 @@
             s3.pick = { view: s3.look, t: 0, key: kh };
             s3Render();
         }
-        window.addEventListener('mousedown', (e) => { if (s3.running && !isPaused && e.button === 0) s3TryPick(); });
+        window.addEventListener('pointerdown', (e) => { if (s3.running && !isPaused && e.button === 0 && !(e.target.closest && e.target.closest('#touch-controls'))) s3TryPick(); });   // 열쇠를 꾹 눌러서 줍기 (마우스·터치 공통)
 
         function s3Enter() {
             if (s3.hidden) {                       // 장롱 안: 문 밀어내기
@@ -439,7 +439,7 @@
                 if (s3.look === 'F' && s3.held) { s3.view = 'lock'; layoutLock(); s3.retarget = 0; s3Render(); return; }
                 if (s3.held) { s3.toast = { text: '이미 열쇠를 들고 있어요. 정면 자물쇠로 가세요', t: 1800 }; s3Render(); return; }
                 const here = s3.keys.some(k => !k.taken && k.view === s3.look);
-                s3.toast = { text: here ? '열쇠는 마우스로 열쇠를 클릭해서 주워요' : (s3.look === 'F' ? (s3KeysLeft() ? '열쇠가 있어야 자물쇠를 열 수 있어요' : '남은 열쇠가 없어요') : '이 방향에는 주울 열쇠가 없어요'), t: 1600 };
+                s3.toast = { text: here ? '열쇠를 꾹 눌러서 주워요' : (s3.look === 'F' ? (s3KeysLeft() ? '열쇠가 있어야 자물쇠를 열 수 있어요' : '남은 열쇠가 없어요') : '이 방향에는 주울 열쇠가 없어요'), t: 1600 };
                 s3Render();
             }
         }
