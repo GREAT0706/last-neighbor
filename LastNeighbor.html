@@ -629,6 +629,7 @@
             <span style="display:flex;gap:10px;align-items:center"><input id="set-vol" type="range" min="0" max="150" step="5" style="width:130px"><b id="set-vol-v" style="min-width:3.2em;text-align:right;color:#fff"></b></span>
             <span>밝기</span>
             <span style="display:flex;gap:10px;align-items:center"><input id="set-bri" type="range" min="0" max="100" step="5" style="width:130px"><b id="set-bri-v" style="min-width:3.2em;text-align:right;color:#fff"></b></span>
+            <div style="grid-column:1/-1;border-top:1px solid #333;padding-top:8px"><div style="font-size:.8rem;color:#888;margin-bottom:2px;text-align:center">🏆 내 기록 (처음부터 끝까지 클리어한 판)</div><table id="rec-table" style="margin:0 auto;border-collapse:collapse;font-size:.88rem;color:#ccc"></table></div>
         </div>
         <div id="bright-ov" style="position:fixed;inset:0;pointer-events:none;z-index:99999;opacity:0"></div>
         <button id="btn-start" class="btn-style">게임 시작</button>
@@ -2103,19 +2104,45 @@
             let rows = `<tr><th ${th}></th><th ${th}>시간</th><th ${th}>사망</th></tr>`;
             [1, 2, 3].forEach(i => { rows += `<tr><td ${td}>스테이지 ${i}</td><td ${td}>${fmtTime(runStat.t[i])}</td><td ${td}>${runStat.d[i]}회</td></tr>`; });
             document.getElementById('rr-table').innerHTML = rows;
+            const full = runStat.t[1] > 0 && runStat.t[2] > 0 && runStat.t[3] > 0;   // 스테이지 1부터 끝까지 한 판만 기록
             let best = '';
-            try {
-                const prev = parseInt(localStorage.getItem('ln_best_' + diffKey) || '0', 10);
-                if (!prev || total < prev) { localStorage.setItem('ln_best_' + diffKey, String(Math.round(total))); best = prev ? '🏆 최고 기록 갱신!' : '🏆 첫 클리어 기록'; }
-                else best = `최고 기록 ${fmtTime(prev)}`;
-            } catch (e) { }
-            document.getElementById('rr-best').textContent = best;
+            if (full) {
+                const rec = loadRec(diffKey), prevT = rec.t, prevD = rec.d;
+                const newT = !prevT || total < prevT, newD = prevD === null || deaths < prevD;
+                if (newT) rec.t = Math.round(total);
+                if (newD) rec.d = deaths;
+                saveRec(diffKey, rec);
+                try { localStorage.setItem('ln_cleared', '1'); } catch (e) { }
+                best = `${newT ? '🏆 최단 시간 갱신!' : '최단 시간 ' + fmtTime(prevT)}<br>${newD ? '🏆 최소 사망 갱신!' : '최소 사망 ' + prevD + '회'}`;
+                renderRecords(); updateStageBtns();
+            } else {
+                best = '스테이지 ' + (runStat.t[2] > 0 ? '2' : '3') + '부터 시작한 기록은 최고 기록에 포함되지 않아요';
+            }
+            document.getElementById('rr-best').innerHTML = best;
             document.getElementById('run-result').style.display = 'block';
         }
         function runHideResult() { document.getElementById('run-result').style.display = 'none'; }
 
         // --- 난이도 / 볼륨 / 밝기 설정 ---
         const DIFF_LABEL = { easy: '쉬움', normal: '보통', hard: '어려움' };
+        function loadRec(k) {
+            let t = 0, d = null;
+            try { t = parseInt(localStorage.getItem('ln_best_' + k) || '0', 10) || 0; const x = localStorage.getItem('ln_bestd_' + k); d = x === null ? null : parseInt(x, 10); } catch (e) { }
+            return { t, d };
+        }
+        function saveRec(k, r) { try { localStorage.setItem('ln_best_' + k, String(r.t)); if (r.d !== null) localStorage.setItem('ln_bestd_' + k, String(r.d)); } catch (e) { } }
+        function renderRecords() {
+            const el = document.getElementById('rec-table'); if (!el) return;
+            const th = 'style="padding:2px 10px;color:#888;font-weight:400"', td = 'style="padding:2px 10px;text-align:center"';
+            let h = `<tr><th ${th}></th><th ${th}>최단 시간</th><th ${th}>최소 사망</th></tr>`;
+            ['easy', 'normal', 'hard'].forEach(k => { const r = loadRec(k); h += `<tr><td ${td}>${DIFF_LABEL[k]}</td><td ${td}>${r.t ? fmtTime(r.t) : '-'}</td><td ${td}>${r.d === null ? '-' : r.d + '회'}</td></tr>`; });
+            el.innerHTML = h;
+        }
+        function updateStageBtns() {
+            let c = false; try { c = localStorage.getItem('ln_cleared') === '1'; } catch (e) { }
+            const show = c && !document.getElementById('ui-overlay').classList.contains('hidden');
+            btnStage2.classList.toggle('hidden', !show); btnStage3.classList.toggle('hidden', !show);
+        }
         let diffKey = 'normal';
         const BASE_DIFF = {
             d1: JSON.parse(JSON.stringify(DIFFICULTY)), react: REACTION_MS,
@@ -2131,8 +2158,8 @@
             normal: { m1: 1, a1: 1, react: null, s2: {}, s3: {} },
             hard: {
                 m1: 1.3, a1: 1.25, react: 550,
-                s2: { PRESS_PUSH: 0.036, RISE_START: 0.30, RISE_END: 0.42, START_OPEN: 0.25, GAP_MS: [1500, 2800] },
-                s3: { PRESS_PUSH: 0.036, RISE_START: 0.27, RISE_MAX: 0.34, START_OPEN: 0.30, FOOTSTEP_MS: 3200, ARRIVAL_GAP_MS: [9000, 14000], FIRST_ARRIVAL_MS: 8000, LOCK_SECONDS: 16, FAKE_CHANCE: 0.2 }
+                s2: { PRESS_PUSH: 0.036, RISE_START: 0.32, RISE_END: 0.45, START_OPEN: 0.25, GAP_MS: [1500, 2800] },
+                s3: { PRESS_PUSH: 0.036, RISE_START: 0.29, RISE_MAX: 0.355, START_OPEN: 0.30, FOOTSTEP_MS: 3200, ARRIVAL_GAP_MS: [9000, 14000], FIRST_ARRIVAL_MS: 8000, LOCK_SECONDS: 16, FAKE_CHANCE: 0.2 }
             }
         };
         function applyDifficulty(key) {
@@ -2180,6 +2207,9 @@
             try { d = localStorage.getItem('ln_diff') || d; v = parseInt(localStorage.getItem('ln_vol') || v, 10); br = parseInt(localStorage.getItem('ln_bri') || br, 10); } catch (e) { }
             setVol.value = v; setBri.value = br;
             applyDifficulty(d); applyVolume(v); applyBrightness(br);
+            renderRecords();
+            updateStageBtns();
+            new MutationObserver(updateStageBtns).observe(document.getElementById('ui-overlay'), { attributes: true, attributeFilter: ['class'] });
         })();
     </script>
 
