@@ -110,16 +110,21 @@
                 held: null, pick: null, last: null
             });
             // 열쇠 자리 랜덤 + 진짜 열쇠 하나 랜덤
-            const spots = [];
-            LOOKS.forEach(k => KEY_POOL[k].forEach(p => spots.push({ view: k, x: p[0], y: p[1] })));
-            for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
-            s3.keys = spots.slice(0, STAGE3.KEY_COUNT).map((sp, i) => Object.assign(sp, { id: i, real: false, taken: false }));
+            // 방(왼쪽/정면/오른쪽)마다 열쇠 1개는 무조건, 나머지는 남은 자리 중 랜덤
+            const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+            const chosen = [], rest = [];
+            LOOKS.forEach(k => {
+                const sp = shuffle(KEY_POOL[k].map(p => ({ view: k, x: p[0], y: p[1] })));
+                chosen.push(sp.shift()); rest.push(...sp);
+            });
+            chosen.push(...shuffle(rest).slice(0, Math.max(0, STAGE3.KEY_COUNT - chosen.length)));
+            s3.keys = chosen.map((sp, i) => Object.assign(sp, { id: i, real: false, taken: false }));
             s3.keys[Math.floor(Math.random() * s3.keys.length)].real = true;
             s3.keyEls.forEach(el => el.remove());
             s3.keyEls = s3.keys.map(() => { const el = oKey.cloneNode(true); el.removeAttribute('id'); oKey.parentNode.appendChild(el); return el; });
 
             progressBar.style.width = '0%'; progressText.textContent = '0%';
-            viewIndicator.textContent = "[← →] 둘러보기 / [ENTER] 열쇠 줍기·자물쇠 / [SPACE] 장롱";
+            viewIndicator.textContent = "[← →] 둘러보기 / [마우스+ENTER] 열쇠 줍기 / [ENTER] 자물쇠 / [SPACE] 장롱";
             s3Hud.classList.remove('hidden');
             s3Render();
             s3.running = true;
@@ -128,9 +133,16 @@
         }
 
         function s3KeysLeft() { return s3.keys.filter(k => !k.taken).length + (s3.held ? 1 : 0); }
-        function s3KeyHere() {
-            let best = null;
-            s3.keys.forEach(k => { if (!k.taken && k.view === s3.look && (!best || Math.abs(k.x - 50) < Math.abs(best.x - 50))) best = k; });
+        function s3KeyHere() {                 // 마우스 커서가 올라가 있는 열쇠 (없으면 null)
+            if (mouseX === null || mouseY === null || s3.hidden || s3.view !== 'room' || s3.turning) return null;
+            let best = null, bd = 1e9;
+            s3.keys.forEach((k, i) => {
+                if (k.taken || k.view !== s3.look) return;
+                const r = s3.keyEls[i].getBoundingClientRect();
+                if (!r.width) return;
+                const d = Math.hypot(mouseX - (r.left + r.width / 2), mouseY - (r.top + r.height / 2));
+                if (d <= Math.max(r.width, r.height) * 0.9 + 14 && d < bd) { bd = d; best = k; }
+            });
             return best;
         }
         function s3LockFail() {
@@ -161,10 +173,13 @@
                 oWall.dataset.k = key;
             }
             // 열쇠 표시
+            const hk = (s3.hidden || inLock) ? null : s3KeyHere();
+            s3.hoverKey = hk;
             s3.keys.forEach((k, i) => {
                 const el = s3.keyEls[i];
                 el.style.display = (!k.taken && k.view === key) ? 'block' : 'none';
                 el.style.left = k.x + '%'; el.style.top = k.y + '%';
+                el.classList.toggle('hot', k === hk);
             });
 
             oVig.style.setProperty('--d', s3.dark.toFixed(3));
@@ -183,7 +198,7 @@
                 s3Compass.style.bottom = '1.2vh';
                 s3Compass.innerHTML = '<span style="border:0;background:none">흰 원 위에 마우스를 올려두세요 / ← → : 돌아서기 / SPACE: 숨기</span>';
             } else {
-                s3Compass.innerHTML = `<span class="arrow">←</span>${LOOKS.map(k => `<span class="${k === s3.look ? 'on' : ''}">${LOOK_NAME[k]}</span>`).join('')}<span class="arrow">→</span><span style="border:0;background:none">ENTER: 줍기 / SPACE: 숨기</span>`;
+                s3Compass.innerHTML = `<span class="arrow">←</span>${LOOKS.map(k => `<span class="${k === s3.look ? 'on' : ''}">${LOOK_NAME[k]}</span>`).join('')}<span class="arrow">→</span><span style="border:0;background:none">마우스+ENTER: 줍기 / SPACE: 숨기</span>`;
             }
 
             // 중앙 문구: 연타 안내 / 줍는 진행도
@@ -192,6 +207,8 @@
                 html = `<div class="big">ENTER 연타!</div><div class="hold"><i style="width:${Math.min(100, s3.holdT / STAGE3.HOLD_MS * 100).toFixed(1)}%"></i></div>`;
             } else if (!s3.hidden && s3.toast) {
                 html = `<div class="mid">${s3.toast.text}</div>`;
+            } else if (!s3.hidden && !inLock && !s3.pick && !s3.held && s3.hoverKey) {
+                html = `<div class="mid">ENTER 또는 클릭: 열쇠 줍기</div>`;
             } else if (!s3.hidden && !inLock && s3.look === 'F' && !s3.pick && s3.held) {
                 html = `<div class="mid">ENTER: 자물쇠 따기</div>`;
             } else if (!s3.hidden && s3.pick) {
@@ -224,6 +241,7 @@
                     s3.clickMs -= s3.nextClickMs;
                     s3.nextClickMs = lerp(PICK_CLICK_INTERVAL.slow, PICK_CLICK_INTERVAL.fast, s3.lockP / 100) * (0.88 + Math.random() * 0.24);
                     playSound('click' + (1 + Math.floor(Math.random() * 3)), { gain: 0.75 + Math.random() * 0.25, rate: 0.96 + Math.random() * 0.08 });
+                    s3.nudge = 1;                                 // 딸깍 소리에 맞춰 손이 움찔
                 }
                 s3.lockP = Math.min(100, s3.lockP + dt / (STAGE3.LOCK_SECONDS * 10));
             }
@@ -342,7 +360,7 @@
 
             // 열쇠 줍기 진행
             if (s3.pick) {
-                if (s3.hidden || s3.look !== s3.pick.view || s3.turning) {
+                if (s3.hidden || s3.look !== s3.pick.view || s3.turning || s3KeyHere() !== s3.pick.key) {
                     s3.pick = null;
                 } else {
                     s3.pick.t += dt;
@@ -399,6 +417,21 @@
             }, TURN_OUT_MS);
         }
 
+        function s3TryPick(fromKey) {           // 마우스 커서가 열쇠 위에 있어야 줍기 시작
+            if (s3.hidden || s3.turning || s3.view !== 'room' || s3.pick || s3.held) return;
+            const kh = s3KeyHere();
+            if (!kh) {
+                if (fromKey) {
+                    const here = s3.keys.some(k => !k.taken && k.view === s3.look);
+                    s3.toast = { text: here ? '열쇠에 마우스 커서를 올려야 주울 수 있어요' : (s3.look === 'F' ? (s3KeysLeft() ? '열쇠가 있어야 자물쇠를 열 수 있어요' : '남은 열쇠가 없어요') : '이 방향에는 주울 열쇠가 없어요'), t: 1600 };
+                }
+                s3Render(); return;
+            }
+            s3.pick = { view: s3.look, t: 0, key: kh };
+            s3Render();
+        }
+        window.addEventListener('mousedown', (e) => { if (s3.running && !isPaused && e.button === 0) s3TryPick(false); });
+
         function s3Enter() {
             if (s3.hidden) {                       // 장롱 안: 문 밀어내기
                 if (s3.phase !== 'attack') return;
@@ -411,13 +444,7 @@
                 if (s3.turning || s3.view === 'lock' || s3.pick) return;
                 if (s3.look === 'F' && s3.held) { s3.view = 'lock'; layoutLock(); s3.retarget = 0; s3Render(); return; }
                 if (s3.held) { s3.toast = { text: '이미 열쇠를 들고 있어요. 정면 자물쇠로 가세요', t: 1800 }; s3Render(); return; }
-                const kh = s3KeyHere();
-                if (!kh) {
-                    if (s3.look === 'F') s3.toast = { text: s3KeysLeft() ? '열쇠가 있어야 자물쇠를 열 수 있어요' : '남은 열쇠가 없어요', t: 1600 };
-                    s3Render(); return;
-                }
-                s3.pick = { view: s3.look, t: 0, key: kh };
-                s3Render();
+                s3TryPick(true);
             }
         }
 

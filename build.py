@@ -53,9 +53,10 @@ css=r"""/* ===== 스테이지 3: 열쇠 찾기 + 장롱 ===== */
 
         #o-pan { position: absolute; inset: 0; will-change: transform, filter; }
         #o-wall { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-        #o-key { position: absolute; width: 3.2%; transform: translate(-50%,-50%); pointer-events: none; display: none;
+            .o-key { position: absolute; width: 5%; transform: translate(-50%,-50%); pointer-events: none; display: none;
             animation: keyGlint 2.4s ease-in-out infinite; }
-        @keyframes keyGlint { 0%,100% { opacity: .55; filter: drop-shadow(0 0 3px rgba(255,215,120,.5)); } 50% { opacity: 1; filter: drop-shadow(0 0 10px rgba(255,225,140,.95)); } }
+        @keyframes keyGlint { 0%,100% { opacity: .8; filter: drop-shadow(0 0 4px rgba(255,215,120,.7)) drop-shadow(0 0 1px #000); } 50% { opacity: 1; filter: drop-shadow(0 0 12px rgba(255,225,140,1)) drop-shadow(0 0 1px #000); } }
+        .o-key.hot { animation: none; opacity: 1; transform: translate(-50%,-50%) scale(1.35); filter: drop-shadow(0 0 16px #fff) drop-shadow(0 0 6px #ffe08a); }
         #o-lock { position: absolute; width: 11%; aspect-ratio: 1; transform: translate(-50%,-50%); pointer-events: none; border-radius: 50%; opacity: 0;
             background: radial-gradient(circle, rgba(255,220,130,.35), rgba(255,220,130,0) 68%); }
         #o-lock.ready { animation: lockGlow 1.8s ease-in-out infinite; }
@@ -100,7 +101,7 @@ views="""<!-- ===== 스테이지 3: 열쇠 찾기 + 장롱 ===== -->
             <div id="o-stage">
                 <div id="o-pan"><img id="o-wall" alt="">
                     <div id="o-lock"></div>
-                    <svg id="o-key" viewBox="0 0 64 64"><g fill="none" stroke="#f2d27a" stroke-width="5" stroke-linecap="round"><circle cx="20" cy="32" r="11"/><path d="M31 32h28M50 32v10M58 32v8"/></g></svg>
+                    <svg id="o-key" class="o-key" viewBox="0 0 64 64"><g fill="none" stroke="#f2d27a" stroke-width="5" stroke-linecap="round"><circle cx="20" cy="32" r="11"/><path d="M31 32h28M50 32v10M58 32v8"/></g></svg>
                 </div>
             </div>
         </div>
@@ -116,7 +117,7 @@ rep('<div id="s2-hud" class="hidden">', views+'<div id="s2-hud" class="hidden">'
 box="""<div id="instruction-box-3" class="hidden bg-gray-900 border border-gray-700 p-6 rounded text-left max-w-xl mb-8">
             <h3 class="text-xl font-bold text-red-500 mb-4 border-b border-gray-700 pb-2">STAGE 3 - 생존 수칙</h3>
             <ul class="list-disc pl-5 space-y-3 text-gray-300">
-                <li>방 곳곳(왼쪽·정면·오른쪽)에 <strong class="text-white">열쇠 5개</strong>가 떨어져 있어요(자리는 매번 달라져요). <strong class="text-white">← →</strong> 로 둘러보고 반짝이는 열쇠를 찾아 <strong class="text-white">ENTER</strong>로 주우세요. (줍는 데 1.5초, 도중에 돌아보면 취소돼요)</li>
+                <li>방 곳곳(왼쪽·정면·오른쪽)에 <strong class="text-white">열쇠 5개</strong>가 떨어져 있어요(방마다 최소 1개, 자리는 매번 달라져요). <strong class="text-white">← →</strong> 로 둘러보고 반짝이는 열쇠를 찾으세요. 방마다 1개 이상 있어요. <strong class="text-white">마우스 커서를 열쇠 위에 올리고</strong> <strong class="text-white">ENTER(또는 클릭)</strong>를 누르면 주워요. (1.5초, 커서를 치우거나 돌아보면 취소돼요)</li>
                 <li><strong class="text-yellow-400">5개 중 진짜 열쇠는 단 하나</strong>예요. 한 번에 하나만 들 수 있고, 맞는지는 <strong class="text-white">자물쇠를 끝까지 따봐야만</strong> 알 수 있어요. 정면 자물쇠 앞에서 <strong class="text-white">ENTER</strong>를 누르면 바로 자물쇠 따기가 시작돼요.</li>
                 <li>움직이는 흰 원 위에 마우스를 올려두어 자물쇠를 풀어요. 100%가 됐을 때 <strong class="text-white">철컥 소리</strong>와 함께 열리면 진짜 열쇠, 열리지 않으면 가짜예요(그 열쇠는 사라져요). 술래 때문에 끊겨도 진행도는 유지돼요.</li>
                 <li><strong class="text-blue-400">발소리가 들리면</strong> 술래가 오고 있는 거예요. <strong class="text-white">SPACE</strong>로 장롱 안에 숨으세요. <strong class="text-red-600 font-bold underline">술래가 도착할 때 밖에 있으면 죽습니다.</strong></li>
@@ -132,6 +133,9 @@ rep('    </script>\n\n    <!-- 이미지 에셋', js+'    </script>\n\n    <!-- 
 
 # lock hand shake while picking in stage 3
 rep("const picking = isGameRunning && !isPaused && currentView === 'lock' && isPicking;","const picking = (isGameRunning && !isPaused && currentView === 'lock' && isPicking) || (s3.running && !isPaused && s3.lockPicking);")
+
+rep("lockHand.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${deg.toFixed(3)}deg)`;",
+    "const k3 = s3.running ? 1.9 : 1; const nd = s3.running ? (s3.nudge || 0) : 0; if (s3.running) s3.nudge = nd * 0.82;\n            lockHand.style.transform = `translate(${(dx * k3 - nd * 7 * sceneScale).toFixed(2)}px, ${(dy * k3 + nd * 3 * sceneScale).toFixed(2)}px) rotate(${(deg * k3 - nd * 1.2).toFixed(3)}deg)`;")
 # stage 2: cancel finished turn animations; show stage 1 rules again after final clear is in stage3
 rep("s2.turnTimer = setTimeout(() => { s2.turning = false; }, TURN_IN_MS);","s2.turnTimer = setTimeout(() => { s2.turning = false; if (roomPan.getAnimations) roomPan.getAnimations().forEach(an => an.cancel()); }, TURN_IN_MS);")
 # integration
