@@ -117,7 +117,7 @@ rep('<div id="s2-hud" class="hidden">', views+'<div id="s2-hud" class="hidden">'
 box="""<div id="instruction-box-3" class="hidden bg-gray-900 border border-gray-700 p-6 rounded text-left max-w-xl mb-8">
             <h3 class="text-xl font-bold text-red-500 mb-4 border-b border-gray-700 pb-2">STAGE 3 - 생존 수칙</h3>
             <ul class="list-disc pl-5 space-y-3 text-gray-300">
-                <li>방 곳곳(왼쪽·정면·오른쪽)에 <strong class="text-white">열쇠 5개</strong>가 떨어져 있어요(방마다 최소 1개, 자리는 매번 달라져요). <strong class="text-white">← →</strong> 로 둘러보고 반짝이는 열쇠를 찾으세요. 방마다 1개 이상 있어요. <strong class="text-white">마우스 커서를 열쇠 위에 올리고</strong> <strong class="text-white">ENTER(또는 클릭)</strong>를 누르면 주워요. (1.5초, 커서를 치우거나 돌아보면 취소돼요)</li>
+                <li>방 곳곳(왼쪽·정면·오른쪽)에 <strong class="text-white">열쇠 5개</strong>가 떨어져 있어요(방마다 최소 1개, 자리는 매번 달라져요). <strong class="text-white">← →</strong> 로 둘러보고 반짝이는 열쇠를 찾으세요. 방마다 1개 이상 있어요. 열쇠를 <strong class="text-white">마우스로 클릭</strong>하면 줍기 시작해요. (1.5초, 커서를 열쇠에서 치우거나 돌아보면 취소돼요)</li>
                 <li><strong class="text-yellow-400">5개 중 진짜 열쇠는 단 하나</strong>예요. 한 번에 하나만 들 수 있고, 맞는지는 <strong class="text-white">자물쇠를 끝까지 따봐야만</strong> 알 수 있어요. 정면 자물쇠 앞에서 <strong class="text-white">ENTER</strong>를 누르면 바로 자물쇠 따기가 시작돼요.</li>
                 <li>움직이는 흰 원 위에 마우스를 올려두어 자물쇠를 풀어요. 100%가 됐을 때 <strong class="text-white">철컥 소리</strong>와 함께 열리면 진짜 열쇠, 열리지 않으면 가짜예요(그 열쇠는 사라져요). 술래 때문에 끊겨도 진행도는 유지돼요.</li>
                 <li><strong class="text-blue-400">발소리가 들리면</strong> 술래가 오고 있는 거예요. <strong class="text-white">SPACE</strong>로 장롱 안에 숨으세요. <strong class="text-red-600 font-bold underline">술래가 도착할 때 밖에 있으면 죽습니다.</strong></li>
