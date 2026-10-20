@@ -302,9 +302,11 @@
             z-index: 100;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: safe center;
             align-items: center;
+            overflow-y: auto;
         }
+        @media (min-width: 1200px) { #settings { position: absolute; top: 16px; right: 16px; margin: 0 !important; } }
 
         #pause-overlay {
             position: fixed;
@@ -581,6 +583,7 @@
         <div id="run-result" style="display:none;margin:0 0 28px;padding:18px 28px;min-width:320px;max-width:92vw;background:rgba(10,10,10,.85);border:1px solid #3a3a3a;border-radius:6px;text-align:center;font-family:'Noto Sans KR',sans-serif;color:#ddd">
             <div style="font-size:.8rem;letter-spacing:.2em;color:#888">TOTAL TIME</div>
             <div id="rr-time" style="font-size:2.6rem;font-weight:700;color:#7CFC8A;text-shadow:0 0 14px rgba(0,255,0,.45);margin:2px 0 10px"></div>
+            <div id="rr-diff" style="font-size:.85rem;color:#999;margin-bottom:4px"></div>
             <div id="rr-deaths" style="font-size:1.15rem;color:#ff6b6b;margin-bottom:12px"></div>
             <table id="rr-table" style="margin:0 auto;border-collapse:collapse;font-size:.92rem;color:#bbb"></table>
             <div id="rr-best" style="margin-top:12px;font-size:.85rem;color:#e6c35c"></div>
@@ -619,6 +622,15 @@
             </ul>
         </div>
 
+        <div id="settings" style="margin:0 0 22px;padding:14px 22px;background:rgba(20,20,24,.9);border:1px solid #3a3a3a;border-radius:6px;font-family:'Noto Sans KR',sans-serif;color:#ccc;font-size:.95rem;display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;max-width:92vw">
+            <span>난이도</span>
+            <span id="diff-btns" style="display:flex;gap:8px"></span>
+            <span>볼륨</span>
+            <span style="display:flex;gap:10px;align-items:center"><input id="set-vol" type="range" min="0" max="150" step="5" style="width:130px"><b id="set-vol-v" style="min-width:3.2em;text-align:right;color:#fff"></b></span>
+            <span>밝기</span>
+            <span style="display:flex;gap:10px;align-items:center"><input id="set-bri" type="range" min="0" max="100" step="5" style="width:130px"><b id="set-bri-v" style="min-width:3.2em;text-align:right;color:#fff"></b></span>
+        </div>
+        <div id="bright-ov" style="position:fixed;inset:0;pointer-events:none;z-index:99999;opacity:0"></div>
         <button id="btn-start" class="btn-style">게임 시작</button>
         <button id="btn-stage2" class="btn-style mt-4" style="font-size:1rem;padding:10px 26px;opacity:0.85;">스테이지 2부터 시작</button>
         <button id="btn-stage3" class="btn-style mt-4" style="font-size:1rem;padding:10px 26px;opacity:0.85;">스테이지 3부터 시작</button>
@@ -657,7 +669,7 @@
         const PICK_SECONDS_PER_PERCENT = 1;   // 진행도 1%를 채우는 데 걸리는 시간 (초). 100%까지 100초
         const PICK_SPEED = (TICK_MS / 1000) / PICK_SECONDS_PER_PERCENT; // 틱당 진행도
         const MAX_DANGER = 100;          // 살인마가 도달하면 사망하는 위험도
-        const REACTION_MS = 650;         // 살인마 발견 후 플래시까지 허용 시간 (ms). 발견하면 살인마는 멈춰 섬
+        let REACTION_MS = 650;         // 살인마 발견 후 플래시까지 허용 시간 (ms). 발견하면 살인마는 멈춰 섬
 
         // 자물쇠 장면 이미지(1920x1048) 속 자물쇠 위치. 이미지를 바꾸면 이 값도 맞춰주세요.
         const LOCK_SCENE = { w: 1920, h: 1048, x: 957, y: 521 };
@@ -1095,6 +1107,7 @@
 
         let audioCtx = null;
         let masterGain = null;
+        let userVol = 1;
         let audioReady = Promise.resolve();
         const soundBuffers = {};
         let heartLoopBuffer = null;
@@ -1114,7 +1127,7 @@
             try {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = MASTER_VOLUME;
+                masterGain.gain.value = MASTER_VOLUME * userVol;
                 masterGain.connect(audioCtx.destination);
                 await Promise.all(Object.entries(SOUND_DATA).map(async ([key, uri]) => {
                     soundBuffers[key] = await audioCtx.decodeAudioData(dataUriToArrayBuffer(uri));
@@ -2084,6 +2097,7 @@
             const total = runStat.t[1] + runStat.t[2] + runStat.t[3];
             const deaths = runStat.d[1] + runStat.d[2] + runStat.d[3];
             document.getElementById('rr-time').textContent = fmtTime(total);
+            document.getElementById('rr-diff').textContent = '난이도: ' + DIFF_LABEL[diffKey];
             document.getElementById('rr-deaths').textContent = deaths === 0 ? '사망 0회 — 노데스 클리어!' : `사망 ${deaths}회`;
             const th = 'style="padding:3px 14px;color:#888;font-weight:400"', td = 'style="padding:3px 14px"';
             let rows = `<tr><th ${th}></th><th ${th}>시간</th><th ${th}>사망</th></tr>`;
@@ -2091,14 +2105,82 @@
             document.getElementById('rr-table').innerHTML = rows;
             let best = '';
             try {
-                const prev = parseInt(localStorage.getItem('ln_best') || '0', 10);
-                if (!prev || total < prev) { localStorage.setItem('ln_best', String(Math.round(total))); best = prev ? '🏆 최고 기록 갱신!' : '🏆 첫 클리어 기록'; }
+                const prev = parseInt(localStorage.getItem('ln_best_' + diffKey) || '0', 10);
+                if (!prev || total < prev) { localStorage.setItem('ln_best_' + diffKey, String(Math.round(total))); best = prev ? '🏆 최고 기록 갱신!' : '🏆 첫 클리어 기록'; }
                 else best = `최고 기록 ${fmtTime(prev)}`;
             } catch (e) { }
             document.getElementById('rr-best').textContent = best;
             document.getElementById('run-result').style.display = 'block';
         }
         function runHideResult() { document.getElementById('run-result').style.display = 'none'; }
+
+        // --- 난이도 / 볼륨 / 밝기 설정 ---
+        const DIFF_LABEL = { easy: '쉬움', normal: '보통', hard: '어려움' };
+        let diffKey = 'normal';
+        const BASE_DIFF = {
+            d1: JSON.parse(JSON.stringify(DIFFICULTY)), react: REACTION_MS,
+            s2: JSON.parse(JSON.stringify(STAGE2)), s3: JSON.parse(JSON.stringify(STAGE3))
+        };
+        // 보통 = 기존 값. 쉬움/어려움은 아래 값으로 덮어씀
+        const DIFF_PRESET = {
+            easy: {
+                m1: 0.7, a1: 0.75, react: 900,
+                s2: { PRESS_PUSH: 0.05, RISE_START: 0.20, RISE_END: 0.30, GAP_MS: [3000, 4500] },
+                s3: { PRESS_PUSH: 0.05, RISE_START: 0.20, RISE_MAX: 0.34, FOOTSTEP_MS: 6000, ARRIVAL_GAP_MS: [15000, 20000], FIRST_ARRIVAL_MS: 14000, LOCK_SECONDS: 8, FAKE_CHANCE: 0.4 }
+            },
+            normal: { m1: 1, a1: 1, react: null, s2: {}, s3: {} },
+            hard: {
+                m1: 1.3, a1: 1.25, react: 550,
+                s2: { PRESS_PUSH: 0.028, RISE_START: 0.30, RISE_END: 0.46, GAP_MS: [1500, 2800] },
+                s3: { PRESS_PUSH: 0.028, RISE_START: 0.30, RISE_MAX: 0.50, FOOTSTEP_MS: 3200, ARRIVAL_GAP_MS: [9000, 14000], FIRST_ARRIVAL_MS: 8000, LOCK_SECONDS: 16, FAKE_CHANCE: 0.2 }
+            }
+        };
+        function applyDifficulty(key) {
+            if (!DIFF_PRESET[key]) key = 'normal';
+            diffKey = key;
+            const pr = DIFF_PRESET[key];
+            ['spawnChance'].forEach(k => { DIFFICULTY[k].start = BASE_DIFF.d1[k].start * pr.m1; DIFFICULTY[k].end = BASE_DIFF.d1[k].end * pr.m1; });
+            ['approachSpeed'].forEach(k => { DIFFICULTY[k].start = BASE_DIFF.d1[k].start * pr.a1; DIFFICULTY[k].end = BASE_DIFF.d1[k].end * pr.a1; });
+            REACTION_MS = pr.react || BASE_DIFF.react;
+            const rs = document.getElementById('reaction-sec'); if (rs) rs.textContent = REACTION_MS / 1000;
+            Object.keys(BASE_DIFF.s2).forEach(k => { STAGE2[k] = pr.s2[k] !== undefined ? pr.s2[k] : BASE_DIFF.s2[k]; });
+            Object.keys(BASE_DIFF.s3).forEach(k => { STAGE3[k] = pr.s3[k] !== undefined ? pr.s3[k] : BASE_DIFF.s3[k]; });
+            document.querySelectorAll('#diff-btns button').forEach(b => {
+                const on = b.dataset.k === key;
+                b.style.background = on ? '#700' : '#1a1a1a'; b.style.borderColor = on ? '#f33' : '#555'; b.style.color = on ? '#fff' : '#aaa';
+            });
+            try { localStorage.setItem('ln_diff', key); } catch (e) { }
+        }
+        const setVol = document.getElementById('set-vol'), setBri = document.getElementById('set-bri'), brightOv = document.getElementById('bright-ov');
+        function applyVolume(v) {
+            userVol = v / 100;
+            if (masterGain) masterGain.gain.value = MASTER_VOLUME * userVol;
+            document.getElementById('set-vol-v').textContent = v + '%';
+            try { localStorage.setItem('ln_vol', String(v)); } catch (e) { }
+        }
+        function applyBrightness(v) {            // 50 = 원래 밝기. 낮추면 어두워지고, 올리면 어두운 부분이 들려 올라옴
+            if (v < 50) { brightOv.style.mixBlendMode = 'normal'; brightOv.style.background = '#000'; brightOv.style.opacity = ((50 - v) / 50 * 0.6).toFixed(2); }
+            else { const g = Math.round((v - 50) / 50 * 40); brightOv.style.mixBlendMode = 'lighten'; brightOv.style.background = `rgb(${g},${g},${g})`; brightOv.style.opacity = v > 50 ? '1' : '0'; }
+            document.getElementById('set-bri-v').textContent = v + '%';
+            try { localStorage.setItem('ln_bri', String(v)); } catch (e) { }
+        }
+        ['easy', 'normal', 'hard'].forEach(k => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.dataset.k = k; b.textContent = DIFF_LABEL[k];
+            b.style.cssText = 'padding:6px 18px;border:2px solid #555;border-radius:4px;cursor:pointer;font-size:.95rem';
+            b.addEventListener('click', () => { applyDifficulty(k); b.blur(); });
+            document.getElementById('diff-btns').appendChild(b);
+        });
+        setVol.addEventListener('input', () => applyVolume(+setVol.value));
+        setBri.addEventListener('input', () => applyBrightness(+setBri.value));
+        setVol.addEventListener('change', () => setVol.blur());
+        setBri.addEventListener('change', () => setBri.blur());
+        (function initSettings() {
+            let d = 'normal', v = 100, br = 50;
+            try { d = localStorage.getItem('ln_diff') || d; v = parseInt(localStorage.getItem('ln_vol') || v, 10); br = parseInt(localStorage.getItem('ln_bri') || br, 10); } catch (e) { }
+            setVol.value = v; setBri.value = br;
+            applyDifficulty(d); applyVolume(v); applyBrightness(br);
+        })();
     </script>
 
     <!-- 이미지 에셋 (base64). 이미지를 바꾸려면 해당 줄의 데이터만 교체하세요. -->
