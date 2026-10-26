@@ -219,6 +219,7 @@ rep("instructionBox.classList.remove('hidden');       // 처음부터 다시 할
 
 # ===== 난이도 선택 + 설정(볼륨/밝기) =====
 rep("const REACTION_MS = 650;","let REACTION_MS = 650;")
+rep("const PICK_SPEED = ","let PICK_SPEED = ")
 rep("        let masterGain = null;","        let masterGain = null;\n        let userVol = 1;")
 rep("masterGain.gain.value = MASTER_VOLUME;","masterGain.gain.value = MASTER_VOLUME * userVol;")
 rep("            justify-content: center;\n            align-items: center;\n        }\n\n        #pause-overlay","            justify-content: safe center;\n            align-items: center;\n            overflow-y: auto;\n        }\n        @media (min-width: 1200px) { #settings { position: absolute; top: 16px; right: 16px; margin: 0 !important; } }\n\n        #pause-overlay")
@@ -262,13 +263,13 @@ settingsjs = r"""
         // 보통 = 기존 값. 쉬움/어려움은 아래 값으로 덮어씀
         const DIFF_PRESET = {
             easy: {
-                m1: 0.7, a1: 0.75, react: 900,
+                m1: 0.7, a1: 0.75, react: 900, t1: 50,
                 s2: { PRESS_PUSH: 0.05, RISE_START: 0.20, RISE_END: 0.30, GAP_MS: [3000, 4500] },
                 s3: { PRESS_PUSH: 0.05, RISE_START: 0.20, RISE_MAX: 0.34, FOOTSTEP_MS: 6000, ARRIVAL_GAP_MS: [15000, 20000], FIRST_ARRIVAL_MS: 14000, LOCK_SECONDS: 8, FAKE_CHANCE: 0.4 }
             },
-            normal: { m1: 1, a1: 1, react: null, s2: {}, s3: {} },
+            normal: { m1: 1, a1: 1, react: null, t1: 60, s2: {}, s3: {} },
             hard: {
-                m1: 1.3, a1: 1.25, react: 550,
+                m1: 1.3, a1: 1.25, react: 550, t1: 70,
                 s2: { PRESS_PUSH: 0.036, RISE_START: 0.32, RISE_END: 0.45, START_OPEN: 0.25, GAP_MS: [1500, 2800] },
                 s3: { PRESS_PUSH: 0.036, RISE_START: 0.29, RISE_MAX: 0.355, START_OPEN: 0.30, FOOTSTEP_MS: 3200, ARRIVAL_GAP_MS: [9000, 14000], FIRST_ARRIVAL_MS: 8000, LOCK_SECONDS: 16, FAKE_CHANCE: 0.2 }
             }
@@ -280,6 +281,7 @@ settingsjs = r"""
             ['spawnChance'].forEach(k => { DIFFICULTY[k].start = BASE_DIFF.d1[k].start * pr.m1; DIFFICULTY[k].end = BASE_DIFF.d1[k].end * pr.m1; });
             ['approachSpeed'].forEach(k => { DIFFICULTY[k].start = BASE_DIFF.d1[k].start * pr.a1; DIFFICULTY[k].end = BASE_DIFF.d1[k].end * pr.a1; });
             REACTION_MS = pr.react || BASE_DIFF.react;
+            PICK_SPEED = (100 / pr.t1) * (TICK_MS / 1000);          // 스테이지 1: 자물쇠를 100% 따는 데 필요한 시간(초) = 쉬움 50 / 보통 60 / 어려움 70
             const rs = document.getElementById('reaction-sec'); if (rs) rs.textContent = REACTION_MS / 1000;
             Object.keys(BASE_DIFF.s2).forEach(k => { STAGE2[k] = pr.s2[k] !== undefined ? pr.s2[k] : BASE_DIFF.s2[k]; });
             Object.keys(BASE_DIFF.s3).forEach(k => { STAGE3[k] = pr.s3[k] !== undefined ? pr.s3[k] : BASE_DIFF.s3[k]; });
