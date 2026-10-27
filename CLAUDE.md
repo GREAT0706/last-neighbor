@@ -9,8 +9,9 @@
 - 수정 후: 빌드 → 스크립트 문법 확인(node --check) → 가능하면 브라우저/jsdom으로 흐름 테스트.
 - 커밋은 의미 있는 단위로, 사용자가 시킬 때 push.
 
-## 랭킹 시스템
-- 서버: `server/ranking.gs` (Google Apps Script, 시트 `records`). 배포 후 `/exec` 주소를 `src/ranking_url.txt`에 넣고 빌드.
-- `ranking_url.txt`가 비어 있으면 랭킹 버튼/등록창은 숨김.
-- 클라이언트 코드는 build.py 끝부분 ranking 블록. 기록은 클라 시간이라 조작 가능(서버는 최소 시간 등 검증만).
-- 테스트: 모의 서버(page.route)로 확인, 실제 Apps Script는 샌드박스에서 접근 불가.
+## 랭킹 시스템 (구글 폼 방식)
+- 설정: `src/ranking_form.json` (form=formResponse 주소, csv=시트 웹 게시 CSV 주소, entry=칸 번호). 없으면 랭킹 UI 숨김.
+- 기록 전송은 폼 POST(no-cors, 응답 못 읽음), 순위표는 게시된 CSV를 읽어 클라이언트에서 정렬·검증(너무 빠른 기록 제외). 시트 열 이름: 닉네임/난이도/시간ms/사망/단계/시간.
+- 클라이언트 코드는 build.py 끝부분 ranking 블록. 기록은 클라 시간이라 조작 가능, CSV는 반영에 몇 분 걸림.
+- `server/ranking.gs`는 예전 Apps Script 방식(현재 미사용).
+- 테스트: 모의 서버(page.route)로 확인, 실제 구글은 샌드박스에서 접근 불가.

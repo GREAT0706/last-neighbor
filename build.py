@@ -432,7 +432,11 @@ rep('    </script>\n\n    <!-- 이미지 에셋', tjs+'    </script>\n\n    <!--
 
 # ===== 전체 랭킹 (구글 스프레드시트 + Apps Script 서버, server/ranking.gs) =====
 import json
-RANKING_URL=open(ROOT+'/src/ranking_url.txt',encoding='utf8').read().strip()
+import os
+RK_CFG={}
+if os.path.exists(ROOT+'/src/ranking_form.json'):
+    RK_CFG=json.load(open(ROOT+'/src/ranking_form.json',encoding='utf8'))
+RANKING_URL=RK_CFG.get('csv','')
 rcss = """
         #rank-modal { display: none; position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,.92); align-items: center; justify-content: center; font-family: 'Noto Sans KR', sans-serif; color: #ddd; }
         #rank-modal.open { display: flex; }
@@ -479,19 +483,49 @@ rep("            document.getElementById('rr-best').innerHTML = best;\n         
 rjs = r"""
         // --- 전체 랭킹 ---
         const RANKING_URL = @@URL@@;
+        const RK_FORM = @@CFG@@;   // 구글 폼으로 전송, 게시된 시트(CSV)로 읽기
         const RANK_DIFFS = ['easy', 'normal', 'hard'];
         let rkDiff = 'normal', rkSort = 'time', pendingRec = null, rkSent = false;
         function rkUrl(q) { return RANKING_URL + (RANKING_URL.includes('?') ? '&' : '?') + q; }
+        function csvParse(t) {
+            const rows = []; let row = [], f = '', q = false;
+            for (let i = 0; i < t.length; i++) {
+                const c = t[i];
+                if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+                else if (c === '"') q = true;
+                else if (c === ',') { row.push(f); f = ''; }
+                else if (c === '\n') { row.push(f); rows.push(row); row = []; f = ''; }
+                else if (c !== '\r') f += c;
+            }
+            if (f !== '' || row.length) { row.push(f); rows.push(row); }
+            return rows;
+        }
+        const RK_MIN1 = { easy: 50, normal: 60, hard: 70 };
         async function rankFetch(diff, sort) {
-            const r = await fetch(rkUrl(`action=top&diff=${diff}&sort=${sort}&n=20&_=${Date.now()}`));
+            const r = await fetch(RANKING_URL + (RANKING_URL.includes('?') ? '&' : '?') + '_=' + Date.now(), { cache: 'no-store' });
             if (!r.ok) throw new Error('http ' + r.status);
-            const j = await r.json(); if (!j.ok) throw new Error(j.error || 'server');
-            return j.rows;
+            const tb = csvParse(await r.text()); if (!tb.length) return [];
+            const h = tb[0].map(x => x.trim()), ix = n => h.indexOf(n);
+            const iN = ix('닉네임'), iD = ix('난이도'), iT = ix('시간ms'), iX = ix('사망'), iS = ix('단계');
+            if (iN < 0 || iD < 0 || iT < 0 || iX < 0) throw new Error('format');
+            const out = [];
+            for (let k = 1; k < tb.length; k++) {
+                const c = tb[k]; if (c[iD] !== diff) continue;
+                const timeMs = Math.round(Number(c[iT])), deaths = Math.round(Number(c[iX])), name = String(c[iN] || '').trim().slice(0, 12);
+                if (!name || !isFinite(timeMs) || !isFinite(deaths) || timeMs < 1 || deaths < 0 || deaths > 500 || timeMs > 6 * 3600000) continue;
+                const st = String(c[iS] || '').split(',').map(Number);   // 말도 안 되게 빠른 기록은 표에서 제외
+                if (st.length !== 3 || st.some(x => !isFinite(x)) || st[0] < RK_MIN1[diff] * 970 || st[1] < 85000 || st[2] < 8000 || Math.abs(st[0] + st[1] + st[2] - timeMs) > 2000) continue;
+                out.push({ name, timeMs, deaths });
+            }
+            out.sort(sort === 'deaths' ? (a, b) => a.deaths - b.deaths || a.timeMs - b.timeMs : (a, b) => a.timeMs - b.timeMs || a.deaths - b.deaths);
+            return out.slice(0, 20);
         }
         async function rankPost(rec) {
-            const r = await fetch(RANKING_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(rec) });
-            if (!r.ok) throw new Error('http ' + r.status);
-            return r.json();
+            const e = RK_FORM.entry, body = new URLSearchParams();
+            body.set(e.name, rec.name); body.set(e.diff, rec.diff); body.set(e.timeMs, String(rec.timeMs));
+            body.set(e.deaths, String(rec.deaths)); body.set(e.stages, rec.stages.join(',')); body.set(e.timeText, fmtTime(rec.timeMs));
+            await fetch(RK_FORM.form, { method: 'POST', mode: 'no-cors', body });   // 응답은 읽을 수 없음(전송만)
+            return { ok: true };
         }
         const RK_ERR = { too_fast: '기록이 너무 빨라서 등록할 수 없어요', sum: '기록이 올바르지 않아요', name: '이름을 입력해 주세요', diff: '난이도 오류', format: '기록 형식 오류', range: '기록 범위 오류' };
         function rkTabs() {
@@ -544,9 +578,9 @@ rjs = r"""
             try {
                 const j = await rankPost(Object.assign({ name, ver: 1 }, pendingRec));
                 if (!j.ok) throw new Error(j.error || 'server');
-                rkSent = true; btn.textContent = '등록 완료';
+                rkSent = true; btn.textContent = '전송 완료';
                 msg.style.color = '#7CFC8A';
-                msg.textContent = j.rank ? `등록 완료! 시간 ${j.rank.time}위 / 사망 ${j.rank.deaths}위 (총 ${j.rank.total}명)` : '등록 완료!';
+                msg.textContent = '기록을 보냈어요! 랭킹에는 몇 분 뒤에 반영돼요.';
                 rkDiff = pendingRec.diff;
             } catch (e) {
                 btn.disabled = false; btn.textContent = '다시 등록';
@@ -563,7 +597,7 @@ rjs = r"""
         if (!RANKING_URL) document.getElementById('rank-open-wrap').style.display = 'none';
         // 이름 입력창에서는 게임 키 입력(스페이스 등)이 가로채이지 않게 함
         window.addEventListener('keydown', (e) => { const t = e.target; if (t && t.tagName === 'INPUT' && t.type !== 'range') e.stopPropagation(); }, true);
-""".replace('@@URL@@', json.dumps(RANKING_URL))
+""".replace('@@URL@@', json.dumps(RANKING_URL)).replace('@@CFG@@', json.dumps(RK_CFG))
 rep('    </script>\n\n    <!-- 이미지 에셋', rjs+'    </script>\n\n    <!-- 이미지 에셋')
 
 open(ROOT+'/index.html','w',encoding='utf8').write(src)
