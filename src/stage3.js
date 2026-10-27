@@ -63,7 +63,7 @@
             s3.running = false;
             cancelAnimationFrame(s3.rafId);
             clearTimeout(s3.turnTimer);
-            if (oPan.getAnimations) oPan.getAnimations().forEach(an => an.cancel());
+            panClear(oPan);
             viewHide.classList.remove('active');
             viewOut.classList.remove('active');
             s3Hud.classList.add('hidden');
@@ -404,16 +404,12 @@
             const dx = step > 0 ? -TURN_SLIDE : TURN_SLIDE;
             s3.pick = null;
             s3.turning = true;
-            if (oPan.animate) oPan.animate(
-                [{ transform: 'translateX(0)', filter: 'blur(0px)' }, { transform: `translateX(${dx}%)`, filter: 'blur(7px)' }],
-                { duration: TURN_OUT_MS, easing: 'ease-in', fill: 'forwards' });
+            panOut(oPan, dx, TURN_OUT_MS);
             s3.turnTimer = setTimeout(() => {
                 s3.look = next;
                 s3Render();
-                if (oPan.animate) oPan.animate(
-                    [{ transform: `translateX(${-dx}%)`, filter: 'blur(7px)' }, { transform: 'translateX(0)', filter: 'blur(0px)' }],
-                    { duration: TURN_IN_MS, easing: 'ease-out', fill: 'forwards' });
-                s3.turnTimer = setTimeout(() => { s3.turning = false; if (oPan.getAnimations) oPan.getAnimations().forEach(an => an.cancel()); }, TURN_IN_MS);
+                panIn(oPan, dx, TURN_IN_MS);
+                s3.turnTimer = setTimeout(() => { s3.turning = false; panClear(oPan); }, TURN_IN_MS);
             }, TURN_OUT_MS);
         }
 
@@ -456,6 +452,7 @@
             s3.running = false;
             cancelAnimationFrame(s3.rafId);
             clearTimeout(s3.turnTimer);
+            panClear(oPan);
             s3Fade.style.opacity = 0;
             isPaused = false;
             pauseOverlay.classList.add('hidden');

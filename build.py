@@ -136,8 +136,6 @@ rep("const picking = isGameRunning && !isPaused && currentView === 'lock' && isP
 
 rep("lockHand.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${deg.toFixed(3)}deg)`;",
     "const k3 = s3.running ? 1.9 : 1; const nd = s3.running ? (s3.nudge || 0) : 0; if (s3.running) s3.nudge = nd * 0.82;\n            lockHand.style.transform = `translate(${(dx * k3 - nd * 7 * sceneScale).toFixed(2)}px, ${(dy * k3 + nd * 3 * sceneScale).toFixed(2)}px) rotate(${(deg * k3 - nd * 1.2).toFixed(3)}deg)`;")
-# stage 2: cancel finished turn animations; show stage 1 rules again after final clear is in stage3
-rep("s2.turnTimer = setTimeout(() => { s2.turning = false; }, TURN_IN_MS);","s2.turnTimer = setTimeout(() => { s2.turning = false; if (roomPan.getAnimations) roomPan.getAnimations().forEach(an => an.cancel()); }, TURN_IN_MS);")
 # integration
 rep("if ((!isGameRunning && !s2.running) || isPaused) return;","if ((!isGameRunning && !s2.running && !s3.running) || isPaused) return;")
 rep("function stage2HideViews() {\n", "function stage2HideViews() {\n            stage3Hide();\n")

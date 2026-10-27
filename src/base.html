@@ -1238,7 +1238,7 @@
             clearTimeout(s2.winTimer);
             clearTimeout(s2.turnTimer);
             roomDark.style.opacity = 0;
-            if (roomPan.getAnimations) roomPan.getAnimations().forEach(an => an.cancel());
+            panClear(roomPan);
             viewRoom.classList.remove('active');
             s2Hud.classList.add('hidden');
         }
@@ -1380,6 +1380,18 @@
         // --- 방향키로 몸 돌리기 (옆으로 쓸려 나가고 반대편에서 들어오는 모션) ---
         const TURN_OUT_MS = 330, TURN_IN_MS = 400, TURN_SLIDE = 22;   // 모션 시간(ms) / 이동 거리(%)
         const roomPan = document.getElementById('room-pan');
+        // 몸 돌리기 모션: CSS transition 사용 (끝나면 인라인 스타일을 완전히 비워서 화면이 밀린 채 남지 않게 함)
+        function panClear(el) { el.style.transition = 'none'; el.style.transform = ''; el.style.filter = ''; }
+        function panOut(el, dx, ms) {
+            panClear(el); void el.offsetWidth;
+            el.style.transition = `transform ${ms}ms ease-in, filter ${ms}ms ease-in`;
+            el.style.transform = `translateX(${dx}%)`; el.style.filter = 'blur(7px)';
+        }
+        function panIn(el, dx, ms) {
+            panClear(el); el.style.transform = `translateX(${-dx}%)`; el.style.filter = 'blur(7px)'; void el.offsetWidth;
+            el.style.transition = `transform ${ms}ms ease-out, filter ${ms}ms ease-out`;
+            el.style.transform = 'translateX(0)'; el.style.filter = 'blur(0px)';
+        }
         function s2Turn(step) {
             if (s2.turning) return;
             const next = ORDER[(ORDER.indexOf(s2.facing) + step + 4) % 4];
@@ -1387,18 +1399,14 @@
             s2.turning = true;
             roomDark.style.transition = `opacity ${TURN_OUT_MS}ms`;
             roomDark.style.opacity = 0.92;
-            if (roomPan.animate) roomPan.animate(
-                [{ transform: 'translateX(0)', filter: 'blur(0px)' }, { transform: `translateX(${dx}%)`, filter: 'blur(7px)' }],
-                { duration: TURN_OUT_MS, easing: 'ease-in', fill: 'forwards' });
+            panOut(roomPan, dx, TURN_OUT_MS);
             s2.turnTimer = setTimeout(() => {
                 s2.facing = next;
                 s2Render();
                 roomDark.style.transition = `opacity ${TURN_IN_MS}ms`;
                 roomDark.style.opacity = 0;
-                if (roomPan.animate) roomPan.animate(
-                    [{ transform: `translateX(${-dx}%)`, filter: 'blur(7px)' }, { transform: 'translateX(0)', filter: 'blur(0px)' }],
-                    { duration: TURN_IN_MS, easing: 'ease-out', fill: 'forwards' });
-                s2.turnTimer = setTimeout(() => { s2.turning = false; }, TURN_IN_MS);
+                panIn(roomPan, dx, TURN_IN_MS);
+                s2.turnTimer = setTimeout(() => { s2.turning = false; panClear(roomPan); }, TURN_IN_MS);
             }, TURN_OUT_MS);
         }
 
@@ -1427,6 +1435,7 @@
             cancelAnimationFrame(s2.rafId);
             clearTimeout(s2.winTimer);
             clearTimeout(s2.turnTimer);
+            panClear(roomPan);
             roomDark.style.opacity = 0;
             isPaused = false;
             pauseOverlay.classList.add('hidden');

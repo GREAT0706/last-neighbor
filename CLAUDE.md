@@ -15,3 +15,6 @@
 - 클라이언트 코드는 build.py 끝부분 ranking 블록. 기록은 클라 시간이라 조작 가능, CSV는 반영에 몇 분 걸림.
 - `server/ranking.gs`는 예전 Apps Script 방식(현재 미사용).
 - 테스트: 모의 서버(page.route)로 확인, 실제 구글은 샌드박스에서 접근 불가.
+
+## 몸 돌리기 모션
+- 스테이지 2·3의 좌우 돌아보기는 WAAPI 대신 CSS transition(`panOut/panIn/panClear`, base.html)을 씀. WAAPI(fill:forwards)는 연타 시 화면이 밀린 채 멈추는 버그가 있었음.
