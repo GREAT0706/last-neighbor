@@ -429,5 +429,142 @@ tjs = r"""
         [btnStart, btnStage2, btnStage3].forEach(b => b.addEventListener('click', tryFullscreen));
 """
 rep('    </script>\n\n    <!-- 이미지 에셋', tjs+'    </script>\n\n    <!-- 이미지 에셋')
+
+# ===== 전체 랭킹 (구글 스프레드시트 + Apps Script 서버, server/ranking.gs) =====
+import json
+RANKING_URL=open(ROOT+'/src/ranking_url.txt',encoding='utf8').read().strip()
+rcss = """
+        #rank-modal { display: none; position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,.92); align-items: center; justify-content: center; font-family: 'Noto Sans KR', sans-serif; color: #ddd; }
+        #rank-modal.open { display: flex; }
+        #rank-box { width: min(560px, 94vw); max-height: 92vh; display: flex; flex-direction: column; background: #101218; border: 1px solid #3a3a3a; border-radius: 8px; padding: 16px 18px; }
+        #rank-box h3 { margin: 0 0 10px; font-size: 1.25rem; color: #ff5555; text-align: center; }
+        .rk-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
+        .rk-tabs button { padding: 5px 14px; border: 2px solid #555; background: #1a1a1a; color: #aaa; border-radius: 4px; cursor: pointer; font-size: .9rem; }
+        .rk-tabs button.on { background: #700; border-color: #f33; color: #fff; }
+        #rank-list { overflow-y: auto; flex: 1; min-height: 120px; touch-action: pan-y; }
+        #rank-list table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+        #rank-list th { color: #888; font-weight: 400; padding: 4px 6px; text-align: center; position: sticky; top: 0; background: #101218; }
+        #rank-list td { padding: 5px 6px; text-align: center; border-top: 1px solid #222; }
+        #rank-list td.nm { text-align: left; word-break: break-all; }
+        #rank-list tr.me td { background: rgba(255,200,60,.14); }
+        #rank-list tr.top1 td:first-child { color: #ffd34d; font-weight: 700; }
+        #rank-close { margin: 12px auto 0; padding: 8px 28px; background: #500; color: #fff; border: 2px solid #f00; border-radius: 5px; cursor: pointer; font-size: 1rem; }
+        .rk-btn { padding: 6px 16px; background: #2a1a00; color: #ffd34d; border: 2px solid #b8860b; border-radius: 4px; cursor: pointer; font-size: .9rem; }
+        #rank-name { padding: 7px 10px; width: 170px; background: #0b0b0b; color: #fff; border: 1px solid #666; border-radius: 4px; font-size: .95rem; user-select: text; -webkit-user-select: text; }
+"""
+rep("        .hidden { display: none !important; }", rcss+"        .hidden { display: none !important; }")
+rhtml = """    <div id="rank-modal"><div id="rank-box">
+        <h3>🏆 전체 랭킹</h3>
+        <div class="rk-tabs" id="rk-diff"></div>
+        <div class="rk-tabs" id="rk-sort"></div>
+        <div id="rank-list"></div>
+        <button id="rank-close" type="button">닫기</button>
+    </div></div>
+"""
+rep('    <div id="game-container">', rhtml+'    <div id="game-container">')
+rsub = """<div id="rr-best" style="margin-top:12px;font-size:.85rem;color:#e6c35c"></div>
+            <div id="rank-submit" style="display:none;margin-top:14px;border-top:1px solid #333;padding-top:12px">
+                <div style="font-size:.85rem;color:#aaa;margin-bottom:8px">🌐 전체 랭킹에 기록 등록</div>
+                <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                    <input id="rank-name" maxlength="12" placeholder="이름 (최대 12자)" autocomplete="off">
+                    <button id="rank-send" type="button" class="rk-btn">등록</button>
+                    <button id="rank-open2" type="button" class="rk-btn" style="color:#ddd;border-color:#666;background:#1a1a1a">랭킹 보기</button>
+                </div>
+                <div id="rank-msg" style="font-size:.85rem;margin-top:8px;min-height:1.3em"></div>
+            </div>"""
+rep('<div id="rr-best" style="margin-top:12px;font-size:.85rem;color:#e6c35c"></div>', rsub)
+rep('<table id="rec-table" style="margin:0 auto;border-collapse:collapse;font-size:.88rem;color:#ccc"></table></div>','<table id="rec-table" style="margin:0 auto;border-collapse:collapse;font-size:.88rem;color:#ccc"></table><div id="rank-open-wrap" style="text-align:center;margin-top:8px"><button id="rank-open" type="button" class="rk-btn">🌐 전체 랭킹 보기</button></div></div>')
+rep("        function runReset() { runStat.t = [0, 0, 0, 0]; runStat.d = [0, 0, 0, 0]; }","        function runReset() { runStat.t = [0, 0, 0, 0]; runStat.d = [0, 0, 0, 0]; runStat.diff = (typeof diffKey === 'string') ? diffKey : 'normal'; }")
+rep("            document.getElementById('rr-best').innerHTML = best;\n            document.getElementById('run-result').style.display = 'block';","            document.getElementById('rr-best').innerHTML = best;\n            document.getElementById('run-result').style.display = 'block';\n            rankOnClear(full && runStat.diff === diffKey, total, deaths);")
+rjs = r"""
+        // --- 전체 랭킹 ---
+        const RANKING_URL = @@URL@@;
+        const RANK_DIFFS = ['easy', 'normal', 'hard'];
+        let rkDiff = 'normal', rkSort = 'time', pendingRec = null, rkSent = false;
+        function rkUrl(q) { return RANKING_URL + (RANKING_URL.includes('?') ? '&' : '?') + q; }
+        async function rankFetch(diff, sort) {
+            const r = await fetch(rkUrl(`action=top&diff=${diff}&sort=${sort}&n=20&_=${Date.now()}`));
+            if (!r.ok) throw new Error('http ' + r.status);
+            const j = await r.json(); if (!j.ok) throw new Error(j.error || 'server');
+            return j.rows;
+        }
+        async function rankPost(rec) {
+            const r = await fetch(RANKING_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(rec) });
+            if (!r.ok) throw new Error('http ' + r.status);
+            return r.json();
+        }
+        const RK_ERR = { too_fast: '기록이 너무 빨라서 등록할 수 없어요', sum: '기록이 올바르지 않아요', name: '이름을 입력해 주세요', diff: '난이도 오류', format: '기록 형식 오류', range: '기록 범위 오류' };
+        function rkTabs() {
+            const d = document.getElementById('rk-diff'), s = document.getElementById('rk-sort');
+            d.innerHTML = ''; s.innerHTML = '';
+            RANK_DIFFS.forEach(k => { const b = document.createElement('button'); b.type = 'button'; b.textContent = DIFF_LABEL[k]; b.className = k === rkDiff ? 'on' : ''; b.onclick = () => { rkDiff = k; rankShow(); }; d.appendChild(b); });
+            [['time', '⏱ 최단 시간'], ['deaths', '💀 최소 사망']].forEach(([k, t]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.className = k === rkSort ? 'on' : ''; b.onclick = () => { rkSort = k; rankShow(); }; s.appendChild(b); });
+        }
+        async function rankShow() {
+            rkTabs();
+            const box = document.getElementById('rank-list');
+            if (!RANKING_URL) { box.textContent = '랭킹 서버가 아직 연결되지 않았어요.'; return; }
+            box.textContent = '불러오는 중...';
+            const myDiff = rkDiff, mySort = rkSort;
+            try {
+                const rows = await rankFetch(myDiff, mySort);
+                if (myDiff !== rkDiff || mySort !== rkSort) return;        // 그 사이에 탭이 바뀌었으면 무시
+                if (!rows.length) { box.textContent = '아직 등록된 기록이 없어요. 첫 번째 주인공이 되어보세요!'; return; }
+                let myName = ''; try { myName = localStorage.getItem('ln_name') || ''; } catch (e) { }
+                const t = document.createElement('table');
+                t.innerHTML = '<tr><th>순위</th><th style="text-align:left">이름</th><th>시간</th><th>사망</th></tr>';
+                rows.forEach((r, i) => {
+                    const tr = document.createElement('tr'); tr.className = (i === 0 ? 'top1 ' : '') + (myName && r.name === myName ? 'me' : '');
+                    const cells = [i + 1 + (i === 0 ? ' 🥇' : i === 1 ? ' 🥈' : i === 2 ? ' 🥉' : ''), r.name, fmtTime(r.timeMs), r.deaths + '회'];
+                    cells.forEach((c, j) => { const td = document.createElement('td'); if (j === 1) td.className = 'nm'; td.textContent = c; tr.appendChild(td); });
+                    t.appendChild(tr);
+                });
+                box.innerHTML = ''; box.appendChild(t);
+            } catch (e) { box.textContent = '랭킹을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 열어주세요.'; }
+        }
+        function rankOpen(diff) { if (diff) rkDiff = diff; document.getElementById('rank-modal').classList.add('open'); rankShow(); }
+        function rankClose() { document.getElementById('rank-modal').classList.remove('open'); }
+        function rankOnClear(eligible, total, deaths) {
+            const box = document.getElementById('rank-submit'), msg = document.getElementById('rank-msg');
+            pendingRec = null; rkSent = false; msg.textContent = ''; msg.style.color = '#ccc';
+            if (!RANKING_URL || !eligible) { box.style.display = 'none'; return; }
+            pendingRec = { diff: diffKey, timeMs: Math.round(total), deaths, stages: [runStat.t[1], runStat.t[2], runStat.t[3]].map(Math.round) };
+            let n = ''; try { n = localStorage.getItem('ln_name') || ''; } catch (e) { }
+            document.getElementById('rank-name').value = n;
+            document.getElementById('rank-send').disabled = false; document.getElementById('rank-send').textContent = '등록';
+            box.style.display = 'block';
+        }
+        async function rankSend() {
+            if (!pendingRec || rkSent) return;
+            const name = document.getElementById('rank-name').value.replace(/\s+/g, ' ').trim().slice(0, 12);
+            const msg = document.getElementById('rank-msg'), btn = document.getElementById('rank-send');
+            if (!name) { msg.style.color = '#ff8888'; msg.textContent = '이름을 입력해 주세요'; return; }
+            try { localStorage.setItem('ln_name', name); } catch (e) { }
+            btn.disabled = true; btn.textContent = '등록 중...'; msg.style.color = '#ccc'; msg.textContent = '';
+            try {
+                const j = await rankPost(Object.assign({ name, ver: 1 }, pendingRec));
+                if (!j.ok) throw new Error(j.error || 'server');
+                rkSent = true; btn.textContent = '등록 완료';
+                msg.style.color = '#7CFC8A';
+                msg.textContent = j.rank ? `등록 완료! 시간 ${j.rank.time}위 / 사망 ${j.rank.deaths}위 (총 ${j.rank.total}명)` : '등록 완료!';
+                rkDiff = pendingRec.diff;
+            } catch (e) {
+                btn.disabled = false; btn.textContent = '다시 등록';
+                msg.style.color = '#ff8888';
+                msg.textContent = RK_ERR[String(e.message)] || '등록에 실패했어요. 인터넷 연결을 확인하고 다시 눌러주세요.';
+            }
+        }
+        document.getElementById('rank-send').addEventListener('click', rankSend);
+        document.getElementById('rank-name').addEventListener('keydown', (e) => { if (e.code === 'Enter') { e.preventDefault(); rankSend(); } });
+        document.getElementById('rank-open').addEventListener('click', () => rankOpen());
+        document.getElementById('rank-open2').addEventListener('click', () => rankOpen(pendingRec ? pendingRec.diff : undefined));
+        document.getElementById('rank-close').addEventListener('click', rankClose);
+        document.getElementById('rank-modal').addEventListener('click', (e) => { if (e.target.id === 'rank-modal') rankClose(); });
+        if (!RANKING_URL) document.getElementById('rank-open-wrap').style.display = 'none';
+        // 이름 입력창에서는 게임 키 입력(스페이스 등)이 가로채이지 않게 함
+        window.addEventListener('keydown', (e) => { const t = e.target; if (t && t.tagName === 'INPUT' && t.type !== 'range') e.stopPropagation(); }, true);
+""".replace('@@URL@@', json.dumps(RANKING_URL))
+rep('    </script>\n\n    <!-- 이미지 에셋', rjs+'    </script>\n\n    <!-- 이미지 에셋')
+
 open(ROOT+'/index.html','w',encoding='utf8').write(src)
 print(len(src))

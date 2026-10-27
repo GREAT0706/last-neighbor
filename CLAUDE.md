@@ -8,3 +8,9 @@
 - 16:9 화면에서는 이미지 좌우 약 12.5%가 잘리므로 클릭/아이템 위치는 가로 20~80% 안쪽에.
 - 수정 후: 빌드 → 스크립트 문법 확인(node --check) → 가능하면 브라우저/jsdom으로 흐름 테스트.
 - 커밋은 의미 있는 단위로, 사용자가 시킬 때 push.
+
+## 랭킹 시스템
+- 서버: `server/ranking.gs` (Google Apps Script, 시트 `records`). 배포 후 `/exec` 주소를 `src/ranking_url.txt`에 넣고 빌드.
+- `ranking_url.txt`가 비어 있으면 랭킹 버튼/등록창은 숨김.
+- 클라이언트 코드는 build.py 끝부분 ranking 블록. 기록은 클라 시간이라 조작 가능(서버는 최소 시간 등 검증만).
+- 테스트: 모의 서버(page.route)로 확인, 실제 Apps Script는 샌드박스에서 접근 불가.
